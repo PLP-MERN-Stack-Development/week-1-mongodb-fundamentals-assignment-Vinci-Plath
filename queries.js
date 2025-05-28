@@ -104,41 +104,44 @@ db.books.createIndex({ author: 1, published_year: 1 });
 
 
 // PERFORMANCE ANALYSIS USING EXPLAIN
-
-// 1. Query using explain before and after index (title)
+// 1. Query before index (likely COLLSCAN)
 db.books.find({ title: "1984" }).explain("executionStats");
 
-// 2. Same query benefits from index (if already created above)
+// 2. Create index on 'title'
+db.books.createIndex({ title: 1 });
+
+// 3. Query after index (should use IXSCAN)
 db.books.find({ title: "1984" }).explain("executionStats");
 
-// 3. Query on author + published_year without index
+// 4. Query on author + published_year (before compound index)
 db.books.find({
   author: "George Orwell",
   published_year: { $gt: 1940 }
 }).explain("executionStats");
 
-// 4. Query using compound index
+// 5. Create compound index
+db.books.createIndex({ author: 1, published_year: 1 });
+
+// 6. Run the same query again (should now use compound index)
 db.books.find({
   author: "George Orwell",
   published_year: { $gt: 1940 }
 }).explain("executionStats");
 
-// 5. Comparing performance hints
-//    i. Force collection scan
-db.books.find({ title: "1984" }).hint({ $natural: 1 }).explain("executionStats");
+// 7. Using hint to compare behavior
+// i. Forces a collection scan (COLLSCAN), ignoring all indexes.
+db.books.find({ title: "1984" }).hint({ $natural: 1 }).explain("executionStats"); 
+// ii. Forces the use of the index on title.
+db.books.find({ title: "1984" }).hint({ title: 1 }).explain("executionStats"); 
 
-//    ii. Use index explicitly
-db.books.find({ title: "1984" }).hint({ title: 1 }).explain("executionStats");
 
+// INDEX MANAGEMENT- 
 
-// INDEX MANAGEMENT
-
-// 1. View all indexes on the collection
+// i. Check existing indexes
 db.books.getIndexes();
 
-// 2. Drop an index by field or name
-//    i. Drop title index
+// ii. Drop index on 'title'
 db.books.dropIndex({ title: 1 });
 
-//    ii. Drop compound index by name (check exact name using getIndexes)
+// iii. Drop compound index (get name from getIndexes())
 db.books.dropIndex("author_1_published_year_1");
